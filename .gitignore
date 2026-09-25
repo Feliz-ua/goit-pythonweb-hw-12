@@ -1,0 +1,9 @@
+.env
+.env.*
+.venv/
+*.db
+__pycache__/
+*.py[cod]
+.pytest_cache/
+avatar.png
+
