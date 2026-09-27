@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: contacts-postgres
+    container_name: contacts-postgres-hw12
     restart: unless-stopped
     env_file:
       - .env
@@ -23,7 +23,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: contacts-api
+    container_name: contacts-api-hw12
     restart: unless-stopped
     env_file:
       - .env
