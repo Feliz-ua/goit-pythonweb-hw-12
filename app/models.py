@@ -1,3 +1,5 @@
+"""SQLAlchemy models for users and contacts."""
+
 from datetime import date
 
 from sqlalchemy import Boolean, Date, ForeignKey, Integer, String
@@ -7,21 +9,42 @@ from app.database import Base
 
 
 class User(Base):
+    """User account stored in the database."""
+
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    username: Mapped[str] = mapped_column(String(50), nullable=False)
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+    username: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )
     email: Mapped[str] = mapped_column(
         String(255),
         unique=True,
         index=True,
         nullable=False,
     )
-    password: Mapped[str] = mapped_column(String(255), nullable=False)
-    avatar: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    password: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+    avatar: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+    )
     confirmed: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
+        nullable=False,
+    )
+    role: Mapped[str] = mapped_column(
+        String(20),
+        default="user",
+        server_default="user",
         nullable=False,
     )
 
@@ -32,19 +55,37 @@ class User(Base):
 
 
 class Contact(Base):
+    """Contact belonging to a user."""
+
     __tablename__ = "contacts"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    first_name: Mapped[str] = mapped_column(String(50), nullable=False)
-    last_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+    first_name: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )
+    last_name: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )
     email: Mapped[str] = mapped_column(
         String(255),
         unique=True,
         index=True,
         nullable=False,
     )
-    phone: Mapped[str] = mapped_column(String(30), nullable=False)
-    birthday: Mapped[date] = mapped_column(Date, nullable=False)
+    phone: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+    )
+    birthday: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
     additional_data: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
@@ -60,4 +101,6 @@ class Contact(Base):
         nullable=False,
         index=True,
     )
-    owner: Mapped[User] = relationship(back_populates="contacts")
+    owner: Mapped[User] = relationship(
+        back_populates="contacts",
+    )

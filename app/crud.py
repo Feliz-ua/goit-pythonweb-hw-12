@@ -1,3 +1,5 @@
+"""Database CRUD operations for contacts."""
+
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import or_, select
@@ -13,6 +15,17 @@ def get_contacts(
     skip: int = 0,
     limit: int = 100,
 ) -> list[Contact]:
+    """Return contacts belonging to a specific user.
+
+    Args:
+        db: Active SQLAlchemy database session.
+        user_id: Identifier of the contact owner.
+        skip: Number of records to skip.
+        limit: Maximum number of records to return.
+
+    Returns:
+        A list of contacts owned by the specified user.
+    """
     statement = (
         select(Contact)
         .where(Contact.user_id == user_id)
@@ -28,6 +41,16 @@ def get_contact(
     contact_id: int,
     user_id: int,
 ) -> Contact | None:
+    """Return one contact belonging to a specific user.
+
+    Args:
+        db: Active SQLAlchemy database session.
+        contact_id: Identifier of the contact.
+        user_id: Identifier of the contact owner.
+
+    Returns:
+        The requested contact, or ``None`` if it was not found.
+    """
     statement = select(Contact).where(
         Contact.id == contact_id,
         Contact.user_id == user_id,
@@ -41,6 +64,16 @@ def get_contact_by_email(
     email: str,
     user_id: int,
 ) -> Contact | None:
+    """Find a user's contact by email address.
+
+    Args:
+        db: Active SQLAlchemy database session.
+        email: Email address to search for.
+        user_id: Identifier of the contact owner.
+
+    Returns:
+        The matching contact, or ``None`` if no contact was found.
+    """
     statement = select(Contact).where(
         Contact.email == email,
         Contact.user_id == user_id,
@@ -54,6 +87,16 @@ def create_contact(
     body: ContactCreate,
     user_id: int,
 ) -> Contact:
+    """Create and persist a new contact.
+
+    Args:
+        db: Active SQLAlchemy database session.
+        body: Validated contact creation data.
+        user_id: Identifier of the contact owner.
+
+    Returns:
+        The newly created contact.
+    """
     contact = Contact(
         **body.model_dump(),
         user_id=user_id,
@@ -71,8 +114,18 @@ def update_contact(
     contact: Contact,
     body: ContactUpdate,
 ) -> Contact:
-    for field, value in body.model_dump().items():
-        setattr(contact, field, value)
+    """Update and persist an existing contact.
+
+    Args:
+        db: Active SQLAlchemy database session.
+        contact: Contact instance to update.
+        body: Validated replacement data.
+
+    Returns:
+        The updated contact.
+    """
+    for key, value in body.model_dump().items():
+        setattr(contact, key, value)
 
     db.commit()
     db.refresh(contact)
@@ -80,7 +133,16 @@ def update_contact(
     return contact
 
 
-def remove_contact(db: Session, contact: Contact) -> None:
+def remove_contact(
+    db: Session,
+    contact: Contact,
+) -> None:
+    """Delete a contact from the database.
+
+    Args:
+        db: Active SQLAlchemy database session.
+        contact: Contact instance to delete.
+    """
     db.delete(contact)
     db.commit()
 
@@ -92,6 +154,21 @@ def search_contacts(
     skip: int = 0,
     limit: int = 100,
 ) -> list[Contact]:
+    """Search a user's contacts by common text fields.
+
+    The search checks first name, last name, email address, and phone
+    number.
+
+    Args:
+        db: Active SQLAlchemy database session.
+        query: Text fragment used for searching.
+        user_id: Identifier of the contact owner.
+        skip: Number of records to skip.
+        limit: Maximum number of records to return.
+
+    Returns:
+        A list of matching contacts.
+    """
     pattern = f"%{query}%"
 
     statement = (
@@ -102,6 +179,7 @@ def search_contacts(
                 Contact.first_name.ilike(pattern),
                 Contact.last_name.ilike(pattern),
                 Contact.email.ilike(pattern),
+                Contact.phone.ilike(pattern),
             ),
         )
         .offset(skip)
@@ -116,23 +194,34 @@ def get_upcoming_birthdays(
     user_id: int,
     days: int = 7,
 ) -> list[Contact]:
+    """Return contacts with birthdays in the upcoming period.
+
+    The year of each birthday is replaced with the current year so
+    that birthdays can be compared with today's date.
+
+    Args:
+        db: Active SQLAlchemy database session.
+        user_id: Identifier of the contact owner.
+        days: Number of days to search ahead.
+
+    Returns:
+        A list of contacts with upcoming birthdays.
+    """
     today = datetime.now(UTC).date()
     end_date = today + timedelta(days=days)
 
     statement = select(Contact).where(Contact.user_id == user_id)
     contacts = db.scalars(statement).all()
 
-    result = []
+    upcoming = []
 
     for contact in contacts:
-        birthday_this_year = contact.birthday.replace(year=today.year)
+        birthday = contact.birthday.replace(year=today.year)
 
-        if birthday_this_year < today:
-            birthday_this_year = birthday_this_year.replace(
-                year=today.year + 1,
-            )
+        if birthday < today:
+            birthday = birthday.replace(year=today.year + 1)
 
-        if today <= birthday_this_year <= end_date:
-            result.append(contact)
+        if today <= birthday <= end_date:
+            upcoming.append(contact)
 
-    return result
+    return upcoming

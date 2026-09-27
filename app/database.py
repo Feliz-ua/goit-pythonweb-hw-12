@@ -1,3 +1,4 @@
+"""Database configuration and session management."""
 import os
 
 from dotenv import load_dotenv
@@ -21,10 +22,12 @@ SessionLocal = sessionmaker(
 
 
 class Base(DeclarativeBase):
+    """Base class for SQLAlchemy ORM models."""
     pass
 
 
 def get_db():
+    """Yield a database session and close it after use."""
     db = SessionLocal()
     try:
         yield db

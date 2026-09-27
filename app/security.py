@@ -1,3 +1,5 @@
+"""Password hashing and JWT security helpers."""
+
 import os
 from datetime import UTC, datetime, timedelta
 

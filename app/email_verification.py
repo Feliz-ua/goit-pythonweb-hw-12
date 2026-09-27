@@ -1,3 +1,5 @@
+"""Create and validate time-limited email verification tokens."""
+
 import os
 
 from dotenv import load_dotenv

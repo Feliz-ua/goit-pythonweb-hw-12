@@ -6,6 +6,7 @@
 
 .. automodule:: app.database
    :members:
+   :exclude-members: Base
 
 .. automodule:: app.models
    :members:

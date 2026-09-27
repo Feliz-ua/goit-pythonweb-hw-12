@@ -1,9 +1,12 @@
+"""User routes."""
+
 import cloudinary.uploader
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
 
-from app.dependencies import CurrentUser, DbSession
+from app.dependencies import AdminUser, CurrentUser, DbSession
 from app.limiter import limiter
 from app.schemas import UserResponse
+
 
 router = APIRouter(
     prefix="/users",
@@ -17,16 +20,24 @@ def read_current_user(
     request: Request,
     current_user: CurrentUser,
 ):
+    """Return the currently authenticated user."""
+
     return current_user
 
 
 @router.patch("/avatar", response_model=UserResponse)
 async def update_avatar(
-    current_user: CurrentUser,
+    current_user: AdminUser,
     db: DbSession,
     file: UploadFile = File(...),
 ):
-    allowed_types = {"image/jpeg", "image/png", "image/webp"}
+    """Update the avatar of the authenticated administrator."""
+
+    allowed_types = {
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+    }
 
     if file.content_type not in allowed_types:
         raise HTTPException(
@@ -49,6 +60,7 @@ async def update_avatar(
     )
 
     current_user.avatar = result["secure_url"]
+
     db.add(current_user)
     db.commit()
     db.refresh(current_user)
