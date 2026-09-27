@@ -4,7 +4,6 @@ from email.message import EmailMessage
 
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
 

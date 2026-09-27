@@ -1,12 +1,9 @@
+import cloudinary.uploader
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
 
-import cloudinary.uploader
-
-from app import cloudinary_config
 from app.dependencies import CurrentUser, DbSession
 from app.limiter import limiter
 from app.schemas import UserResponse
-
 
 router = APIRouter(
     prefix="/users",

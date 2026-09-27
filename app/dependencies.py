@@ -36,8 +36,8 @@ def get_current_user(
 
         user_id = int(subject)
 
-    except (jwt.PyJWTError, ValueError, TypeError):
-        raise credentials_exception
+    except (jwt.PyJWTError, ValueError, TypeError) as error:
+        raise credentials_exception from error
 
     user = db.get(User, user_id)
 

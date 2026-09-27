@@ -4,14 +4,12 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from app.database import Base, engine
-from app.routes.contacts import router as contacts_router
-from app.routes.auth import router as auth_router
-from app.routes.users import router as users_router
-
 import app.models
-
+from app.database import Base, engine
 from app.limiter import limiter
+from app.routes.auth import router as auth_router
+from app.routes.contacts import router as contacts_router
+from app.routes.users import router as users_router
 
 Base.metadata.create_all(bind=engine)
 

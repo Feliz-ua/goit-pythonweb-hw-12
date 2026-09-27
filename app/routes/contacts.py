@@ -13,6 +13,7 @@ router = APIRouter(
     tags=["contacts"],
 )
 
+
 DbSession = Annotated[Session, Depends(get_db)]
 
 
@@ -136,10 +137,7 @@ def update(
         user_id=current_user.id,
     )
 
-    if (
-        existing_contact is not None
-        and existing_contact.id != contact_id
-    ):
+    if existing_contact is not None and existing_contact.id != contact_id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="A contact with this email already exists",

@@ -1,9 +1,7 @@
 import os
 
 from dotenv import load_dotenv
-from itsdangerous import BadSignature, SignatureExpired
-from itsdangerous import URLSafeTimedSerializer
-
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 load_dotenv()
 

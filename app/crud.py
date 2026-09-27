@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -116,7 +116,7 @@ def get_upcoming_birthdays(
     user_id: int,
     days: int = 7,
 ) -> list[Contact]:
-    today = date.today()
+    today = datetime.now(UTC).date()
     end_date = today + timedelta(days=days)
 
     statement = select(Contact).where(Contact.user_id == user_id)

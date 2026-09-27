@@ -21,7 +21,6 @@ from app.security import (
     verify_password,
 )
 
-
 router = APIRouter(
     prefix="/auth",
     tags=["auth"],

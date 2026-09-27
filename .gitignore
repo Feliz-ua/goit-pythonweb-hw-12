@@ -7,3 +7,10 @@ __pycache__/
 .pytest_cache/
 avatar.png
 docs/build/
+.coverage
+.coverage.*
+htmlcov/
+dist/
+build/
+*.egg-info/
+.vscode/
