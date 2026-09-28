@@ -1,4 +1,4 @@
-"""Redis client configuration and user-cache helpers."""
+"""Redis helpers for user caching."""
 
 import json
 import os
@@ -7,18 +7,19 @@ from typing import Any
 import redis
 from dotenv import load_dotenv
 
+from app.models import User
+
 
 load_dotenv()
 
 
 REDIS_URL = os.getenv(
     "REDIS_URL",
-    "redis://localhost:6379/0",
+    "redis://redis:6379/0",
 )
-USER_CACHE_TTL = int(
+REDIS_USER_TTL = int(
     os.getenv("REDIS_USER_TTL", "900"),
 )
-
 
 redis_client = redis.Redis.from_url(
     REDIS_URL,
@@ -26,43 +27,44 @@ redis_client = redis.Redis.from_url(
 )
 
 
-def user_cache_key(user_id: int) -> str:
-    """Return the Redis key used for a cached user."""
+def _user_key(user_id: int) -> str:
     return f"user:{user_id}"
 
 
-def serialize_user(user: Any) -> str:
-    """Serialize the user fields needed by the API response."""
-    return json.dumps(
-        {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "avatar": user.avatar,
-            "confirmed": user.confirmed,
-        }
-    )
+def _user_to_dict(user: User) -> dict[str, Any]:
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "password": user.password,
+        "avatar": user.avatar,
+        "confirmed": user.confirmed,
+        "role": user.role,
+    }
 
 
-def cache_user(user: Any) -> None:
-    """Store a user in Redis with a finite TTL."""
+def cache_user(user: User) -> None:
+    """Cache a user, including role, with a limited lifetime."""
+
     redis_client.setex(
-        user_cache_key(user.id),
-        USER_CACHE_TTL,
-        serialize_user(user),
+        _user_key(user.id),
+        REDIS_USER_TTL,
+        json.dumps(_user_to_dict(user)),
     )
 
 
 def get_cached_user(user_id: int) -> dict[str, Any] | None:
-    """Return a cached user payload, or ``None`` on a cache miss."""
-    cached_user = redis_client.get(user_cache_key(user_id))
+    """Return a cached user or None when the cache misses."""
 
-    if cached_user is None:
+    value = redis_client.get(_user_key(user_id))
+
+    if value is None:
         return None
 
-    return json.loads(cached_user)
+    return json.loads(value)
 
 
 def delete_cached_user(user_id: int) -> None:
-    """Remove a cached user from Redis."""
-    redis_client.delete(user_cache_key(user_id))
+    """Delete a cached user."""
+
+    redis_client.delete(_user_key(user_id))

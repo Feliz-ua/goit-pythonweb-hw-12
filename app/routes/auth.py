@@ -54,6 +54,7 @@ def register(
     db: Session = Depends(get_db),
 ):
     """Register a user and send an email verification link."""
+
     statement = select(User).where(User.email == body.email)
     existing_user = db.scalar(statement)
 
@@ -82,6 +83,7 @@ def register(
     except Exception as error:
         db.delete(user)
         db.commit()
+
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Could not send verification email",
@@ -96,6 +98,7 @@ def verify_email(
     db: Session = Depends(get_db),
 ):
     """Verify a user's email address using a signed token."""
+
     email = verify_verification_token(token)
 
     if email is None:
@@ -122,46 +125,35 @@ def verify_email(
     return {"message": "Email verified successfully"}
 
 
-@router.post(
-    "/login",
-    response_model=TokenResponse,
-)
-def login(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+@router.post("/password-reset")
+def request_password_reset(
+    body: PasswordResetRequest,
     db: Session = Depends(get_db),
 ):
-    """Authenticate a confirmed user and return a JWT access token."""
+    """Create a reset token and send a password reset link."""
 
-    statement = select(User).where(User.email == form_data.username)
+    statement = select(User).where(User.email == body.email)
     user = db.scalar(statement)
 
-    if user is None or not verify_password(
-        form_data.password,
-        user.password,
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    if user is not None:
+        token = create_reset_token(user.id)
 
-    if not user.confirmed:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email is not verified",
-        )
+        try:
+            send_password_reset_email(user.email, token)
+        except Exception as error:
+            delete_reset_token(token)
 
-    access_token = create_access_token(
-        subject=str(user.id),
-        expires_delta=timedelta(
-            minutes=ACCESS_TOKEN_EXPIRE_MINUTES,
-        ),
-    )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Could not send password reset email",
+            ) from error
 
     return {
-        "access_token": access_token,
-        "token_type": "bearer",
+        "message": (
+            "If the email exists, a password reset link has been sent."
+        ),
     }
+
 
 @router.post("/password-reset/confirm")
 def confirm_password_reset(
@@ -169,6 +161,7 @@ def confirm_password_reset(
     db: Session = Depends(get_db),
 ):
     """Reset the password using a one-time Redis token."""
+
     user_id = consume_reset_token(body.token)
 
     if user_id is None:
@@ -188,7 +181,9 @@ def confirm_password_reset(
     user.password = hash_password(body.new_password)
     db.commit()
 
-    return {"message": "Password has been reset successfully"}
+    return {
+        "message": "Password has been reset successfully",
+    }
 
 
 @router.post(
@@ -200,10 +195,14 @@ def login(
     db: Session = Depends(get_db),
 ):
     """Authenticate a confirmed user and return a JWT access token."""
+
     statement = select(User).where(User.email == form_data.username)
     user = db.scalar(statement)
 
-    if user is None or not verify_password(form_data.password, user.password):
+    if user is None or not verify_password(
+        form_data.password,
+        user.password,
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",

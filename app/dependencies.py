@@ -26,7 +26,7 @@ def get_current_user(
     token: Token,
     db: DbSession,
 ) -> User:
-    """Validate JWT and return the current user from Redis or PostgreSQL."""
+    """Return the authenticated user from Redis or PostgreSQL."""
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -65,7 +65,7 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
 def require_admin(current_user: CurrentUser) -> User:
-    """Allow access only to users with the admin role."""
+    """Allow access only to administrators."""
 
     if current_user.role != "admin":
         raise HTTPException(

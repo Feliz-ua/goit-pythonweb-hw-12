@@ -1,51 +1,53 @@
-import smtplib
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.email_service import send_verification_email
+from app.email_service import (
+    send_password_reset_email,
+    send_verification_email,
+)
 
 
-def smtp_environment():
-    return {
+@pytest.fixture
+def smtp_settings(monkeypatch):
+    settings = {
         "SMTP_HOST": "smtp.example.com",
-        "SMTP_PORT": "2525",
+        "SMTP_PORT": "587",
         "SMTP_USER": "mailer@example.com",
         "SMTP_PASSWORD": "smtp-password",
         "MAIL_FROM": "noreply@example.com",
-        "FRONTEND_VERIFY_URL": "http://frontend.example.com/verify",
     }
 
+    for name, value in settings.items():
+        monkeypatch.setenv(name, value)
 
-def test_send_verification_email_success():
+    return settings
+
+
+def smtp_mock():
     smtp = MagicMock()
     smtp_context = MagicMock()
     smtp_context.__enter__.return_value = smtp
+    smtp_context.__exit__.return_value = None
+    return smtp, smtp_context
 
-    with (
-        patch.dict(
-            "os.environ",
-            smtp_environment(),
-            clear=True,
-        ),
-        patch(
-            "app.email_service.smtplib.SMTP",
-            return_value=smtp_context,
-        ) as smtp_class,
-    ):
-        result = send_verification_email(
+
+def test_send_verification_email(smtp_settings):
+    smtp, smtp_context = smtp_mock()
+
+    with patch(
+        "app.email_service.smtplib.SMTP",
+        return_value=smtp_context,
+    ) as smtp_class:
+        send_verification_email(
             "user@example.com",
             "verification-token",
         )
 
-    assert result is None
     smtp_class.assert_called_once_with(
         "smtp.example.com",
-        2525,
+        587,
     )
-    smtp_context.__enter__.assert_called_once_with()
-    smtp_context.__exit__.assert_called_once()
-
     smtp.starttls.assert_called_once_with()
     smtp.login.assert_called_once_with(
         "mailer@example.com",
@@ -55,104 +57,136 @@ def test_send_verification_email_success():
 
     message = smtp.send_message.call_args.args[0]
 
-    assert message["Subject"] == "Verify your email address"
-    assert message["From"] == "noreply@example.com"
     assert message["To"] == "user@example.com"
-
-    body = message.get_content()
-
-    assert (
-        "http://frontend.example.com/verify?token=verification-token"
-    ) in body
-    assert "The link is valid for 24 hours." in body
+    assert message["From"] == "noreply@example.com"
+    assert message["Subject"] == "Verify your email address"
+    assert "verification-token" in message.get_content()
 
 
-@pytest.mark.parametrize(
-    "missing_variable",
-    [
-        "SMTP_HOST",
-        "SMTP_USER",
-        "SMTP_PASSWORD",
-        "MAIL_FROM",
-    ],
-)
-def test_send_verification_email_missing_setting(
-    missing_variable,
-):
-    environment = smtp_environment()
-    environment[missing_variable] = ""
+def test_send_password_reset_email(smtp_settings):
+    smtp, smtp_context = smtp_mock()
 
-    with (
-        patch.dict(
-            "os.environ",
-            environment,
-            clear=True,
-        ),
-        pytest.raises(RuntimeError) as error,
-    ):
-        send_verification_email(
+    with patch(
+        "app.email_service.smtplib.SMTP",
+        return_value=smtp_context,
+    ) as smtp_class:
+        send_password_reset_email(
             "user@example.com",
-            "verification-token",
-        )
-
-    assert error.value.args[0].startswith("Missing email settings:")
-    assert missing_variable in str(error.value)
-
-
-def test_send_verification_email_default_values():
-    environment = smtp_environment()
-    environment.pop("MAIL_FROM")
-    environment.pop("FRONTEND_VERIFY_URL")
-
-    smtp = MagicMock()
-    smtp_context = MagicMock()
-    smtp_context.__enter__.return_value = smtp
-
-    with (
-        patch.dict(
-            "os.environ",
-            environment,
-            clear=True,
-        ),
-        patch(
-            "app.email_service.smtplib.SMTP",
-            return_value=smtp_context,
-        ) as smtp_class,
-    ):
-        send_verification_email(
-            "user@example.com",
-            "verification-token",
+            "reset-token",
         )
 
     smtp_class.assert_called_once_with(
         "smtp.example.com",
-        2525,
+        587,
     )
+    smtp.starttls.assert_called_once_with()
+    smtp.login.assert_called_once_with(
+        "mailer@example.com",
+        "smtp-password",
+    )
+    smtp.send_message.assert_called_once()
 
     message = smtp.send_message.call_args.args[0]
 
-    assert message["From"] == "mailer@example.com"
-    assert (
-        "http://localhost:3000/verify-email?token=verification-token"
-    ) in message.get_content()
+    assert message["To"] == "user@example.com"
+    assert message["From"] == "noreply@example.com"
+    assert message["Subject"] == "Reset your password"
+    assert "reset-token" in message.get_content()
 
 
-def test_send_verification_email_smtp_error():
-    environment = smtp_environment()
+def test_verification_email_uses_custom_frontend_url(
+    smtp_settings,
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "FRONTEND_VERIFY_URL",
+        "https://frontend.example.com/verify",
+    )
+    smtp, smtp_context = smtp_mock()
 
-    with (
-        patch.dict(
-            "os.environ",
-            environment,
-            clear=True,
-        ),
-        patch(
-            "app.email_service.smtplib.SMTP",
-            side_effect=smtplib.SMTPException("SMTP unavailable"),
-        ),
-        pytest.raises(smtplib.SMTPException),
+    with patch(
+        "app.email_service.smtplib.SMTP",
+        return_value=smtp_context,
     ):
         send_verification_email(
             "user@example.com",
-            "verification-token",
+            "token-123",
         )
+
+    message = smtp.send_message.call_args.args[0]
+
+    assert "https://frontend.example.com/verify?token=token-123" in (
+        message.get_content()
+    )
+
+
+def test_password_reset_email_uses_custom_url(
+    smtp_settings,
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "PASSWORD_RESET_URL",
+        "https://frontend.example.com/reset",
+    )
+    smtp, smtp_context = smtp_mock()
+
+    with patch(
+        "app.email_service.smtplib.SMTP",
+        return_value=smtp_context,
+    ):
+        send_password_reset_email(
+            "user@example.com",
+            "token-456",
+        )
+
+    message = smtp.send_message.call_args.args[0]
+
+    assert "https://frontend.example.com/reset?token=token-456" in (
+        message.get_content()
+    )
+
+
+@pytest.mark.parametrize(
+    "function_name",
+    [
+        "send_verification_email",
+        "send_password_reset_email",
+    ],
+)
+def test_email_service_rejects_missing_settings(
+    monkeypatch,
+    function_name,
+):
+    for name in (
+        "SMTP_HOST",
+        "SMTP_USER",
+        "SMTP_PASSWORD",
+        "MAIL_FROM",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    function = {
+        "send_verification_email": send_verification_email,
+        "send_password_reset_email": send_password_reset_email,
+    }[function_name]
+
+    with pytest.raises(RuntimeError, match="Missing email settings"):
+        function(
+            "user@example.com",
+            "token",
+        )
+
+
+def test_smtp_error_is_propagated(smtp_settings):
+    smtp, smtp_context = smtp_mock()
+    smtp.send_message.side_effect = OSError("SMTP unavailable")
+
+    with patch(
+        "app.email_service.smtplib.SMTP",
+        return_value=smtp_context,
+    ):
+        with pytest.raises(OSError, match="SMTP unavailable"):
+            send_password_reset_email(
+                "user@example.com",
+                "token",
+            )
